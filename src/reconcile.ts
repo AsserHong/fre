@@ -14,7 +14,10 @@ import { isArr, createText } from './h'
 import { commit } from './commit'
 
 let currentFiber: IFiber = null
+
+// fiber链表
 let effectList: IFiber = null
+
 let deletions: any = []
 
 export const enum TAG {
@@ -44,12 +47,12 @@ export const update = (fiber?: IFiber) => {
   }
 }
 
-const reconcile = (fiber?: IFiber): boolean => {
+const reconcile = (fiber?: IFiber): Function | null => {
   while (fiber && !shouldYield()) fiber = capture(fiber)
   if (fiber) return reconcile.bind(null, fiber)
   return null
 }
-
+  
 const memo = (fiber) => {
   if ((fiber.type as FC).memo && fiber.oldProps) {
     let scu = (fiber.type as FC).shouldUpdate || shouldUpdate
@@ -67,9 +70,9 @@ const capture = (fiber: IFiber): IFiber | undefined => {
     if (memoFiber) {
       return memoFiber
     }
-    updateHook(fiber)
+    updateHook(fiber) // 此时 fiber是组件fiber
   } else {
-    updateHost(fiber)
+    updateHost(fiber) // 此时 fiber是dom fiber
   }
   if (fiber.child) return fiber.child
   const sibling = getSibling(fiber)
@@ -112,6 +115,10 @@ const shouldUpdate = (a, b) => {
 const updateHook = <P = Attributes>(fiber: IFiber): any => {
   resetCursor()
   currentFiber = fiber
+  /**
+   * 1. children 是函数组件的返回值
+   * 2. 此时会执行FC的函数体
+   */
   let children = (fiber.type as FC<P>)(fiber.props)
   diffKids(fiber, simpleVnode(children))
 }
@@ -126,6 +133,9 @@ const updateHost = (fiber: IFiber): void => {
   diffKids(fiber, fiber.props.children)
 }
 
+/**
+ * @description: 处理FC的返回值，假如为字符串，就创建一个文本节点VNode
+ */
 const simpleVnode = (type: any) =>
   isStr(type) ? createText(type as string) : type
 
